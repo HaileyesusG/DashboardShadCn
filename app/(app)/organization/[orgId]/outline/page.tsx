@@ -37,12 +37,11 @@ import { DataTable, Outline } from "@/components/data-table";
 const SECTION_TYPES = [
     "Table of Contents",
     "Executive Summary",
-    "Introduction",
-    "Methodology",
-    "Results",
-    "Discussion",
-    "Conclusion",
-    "References",
+    "Technical Approach",
+    "Design",
+    "Capabilities",
+    "Focus Document",
+    "Narrative",
 ];
 
 const STATUSES = ["Pending", "In-Progress", "Completed"];

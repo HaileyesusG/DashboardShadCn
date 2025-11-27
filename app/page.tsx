@@ -15,23 +15,40 @@ export default function Home() {
         const user = localStorage.getItem("user");
 
         if (sessionToken && user) {
-            // Check for pending invitations first
-            fetch("/api/invitations", {
-                headers: {
-                    "Authorization": `Bearer ${sessionToken}`,
-                },
-            })
-                .then(res => res.json())
-                .then(data => {
-                    if (data.invitations && data.invitations.length > 0) {
-                        // User has pending invitations
+            // Check for existing organizations and invitations
+            Promise.all([
+                fetch("/api/organization", {
+                    headers: {
+                        "Authorization": `Bearer ${sessionToken}`,
+                    },
+                }),
+                fetch("/api/invitations", {
+                    headers: {
+                        "Authorization": `Bearer ${sessionToken}`,
+                    },
+                })
+            ])
+                .then(([orgRes, invRes]) => Promise.all([orgRes.json(), invRes.json()]))
+                .then(([orgData, invData]) => {
+                    // Priority 1: Check for pending invitations
+                    if (invData.invitations && invData.invitations.length > 0) {
                         router.push("/invitations");
-                    } else {
-                        // No invitations, go to create organization
-                        router.push("/create-organization");
+                        return;
                     }
+
+                    // Priority 2: Check for existing organizations
+                    if (orgData.organizations && orgData.organizations.length > 0) {
+                        // User has organizations, redirect to the first one
+                        const firstOrg = orgData.organizations[0];
+                        router.push(`/organization/${firstOrg.id}/outline`);
+                        return;
+                    }
+
+                    // Priority 3: No organizations or invitations, create one
+                    router.push("/create-organization");
                 })
                 .catch(() => {
+                    // On error, redirect to create organization
                     router.push("/create-organization");
                 });
         } else {

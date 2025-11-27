@@ -16,38 +16,22 @@ export default function CreateOrganizationPage() {
     const [orgName, setOrgName] = useState("");
 
     useEffect(() => {
-        // Check if user already has organizations
-        const checkExistingOrganizations = async () => {
+        // Check authentication
+        const checkAuth = async () => {
             try {
                 const sessionToken = localStorage.getItem("session_token");
                 if (!sessionToken) {
                     router.push("/signin");
                     return;
                 }
-
-                const response = await fetch("/api/organization", {
-                    headers: {
-                        "Authorization": `Bearer ${sessionToken}`,
-                    },
-                });
-
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data.organizations && data.organizations.length > 0) {
-                        // User has organizations, redirect to the first one
-                        const firstOrg = data.organizations[0];
-                        router.push(`/organization/${firstOrg.id}/outline`);
-                        return;
-                    }
-                }
             } catch (error) {
-                console.error("Error checking organizations:", error);
+                console.error("Error checking authentication:", error);
             } finally {
                 setIsCheckingOrgs(false);
             }
         };
 
-        checkExistingOrganizations();
+        checkAuth();
     }, [router]);
 
     const handleSubmit = async (e: React.FormEvent) => {
