@@ -40,6 +40,15 @@ export function NavUser({
 }) {
   const { isMobile } = useSidebar()
 
+  const handleLogout = () => {
+    // Clear session data
+    localStorage.removeItem("session_token")
+    localStorage.removeItem("user")
+
+    // Redirect to signin page
+    window.location.href = "/signin"
+  }
+
   return (
     <SidebarMenu>
       <SidebarMenuItem>
@@ -98,7 +107,7 @@ export function NavUser({
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={handleLogout}>
               <LogOutIcon />
               Log out
             </DropdownMenuItem>

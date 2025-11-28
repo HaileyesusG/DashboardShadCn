@@ -33,6 +33,10 @@ interface Member {
         id: string;
         email: string;
         name: string | null;
+        ownedOrganizations?: Array<{
+            id: string;
+            name: string;
+        }>;
     };
 }
 
@@ -43,6 +47,7 @@ export default function TeamPage() {
     const orgId = params.orgId as string;
 
     const [members, setMembers] = useState<Member[]>([]);
+    const [organizationName, setOrganizationName] = useState<string>("");
     const [isLoading, setIsLoading] = useState(true);
     const [inviteEmail, setInviteEmail] = useState("");
     const [isInviting, setIsInviting] = useState(false);
@@ -51,7 +56,28 @@ export default function TeamPage() {
 
     useEffect(() => {
         fetchMembers();
+        fetchOrganization();
     }, [orgId]);
+
+    const fetchOrganization = async () => {
+        try {
+            const sessionToken = localStorage.getItem("session_token");
+            const response = await fetch("/api/organization", {
+                headers: {
+                    "Authorization": `Bearer ${sessionToken}`,
+                },
+            });
+            if (response.ok) {
+                const data = await response.json();
+                const currentOrg = data.organizations?.find((org: any) => org.id === orgId);
+                if (currentOrg) {
+                    setOrganizationName(currentOrg.name);
+                }
+            }
+        } catch (error) {
+            console.error("Error fetching organization:", error);
+        }
+    };
 
     const fetchMembers = async () => {
         try {
@@ -164,6 +190,11 @@ export default function TeamPage() {
                 <CardHeader>
                     <div className="flex items-center justify-between">
                         <div>
+                            {organizationName && (
+                                <p className="text-sm text-muted-foreground mb-2">
+                                    Organization: <span className="font-medium text-foreground">{organizationName}</span>
+                                </p>
+                            )}
                             <CardTitle className="text-2xl">Team Members</CardTitle>
                             <CardDescription>
                                 Manage your organization members and their roles
@@ -221,6 +252,7 @@ export default function TeamPage() {
                                     <TableHead>Name</TableHead>
                                     <TableHead>Email</TableHead>
                                     <TableHead>Role</TableHead>
+                                    <TableHead>Organizations</TableHead>
                                     {isOwner && <TableHead className="text-right">Actions</TableHead>}
                                 </TableRow>
                             </TableHeader>
@@ -234,12 +266,21 @@ export default function TeamPage() {
                                         <TableCell>
                                             <span
                                                 className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${member.role === "owner"
-                                                    ? "bg-blue-100 text-blue-800"
-                                                    : "bg-gray-100 text-gray-800"
+                                                        ? "bg-blue-100 text-blue-800"
+                                                        : "bg-gray-100 text-gray-800"
                                                     }`}
                                             >
                                                 {member.role}
                                             </span>
+                                        </TableCell>
+                                        <TableCell>
+                                            {member.user.ownedOrganizations && member.user.ownedOrganizations.length > 0 ? (
+                                                <span className="text-sm">
+                                                    {member.user.ownedOrganizations.map(org => org.name).join(", ")}
+                                                </span>
+                                            ) : (
+                                                <span className="text-sm text-muted-foreground">None</span>
+                                            )}
                                         </TableCell>
                                         {isOwner && (
                                             <TableCell className="text-right">
@@ -261,6 +302,6 @@ export default function TeamPage() {
                     )}
                 </CardContent>
             </Card>
-        </div>
+        </div >
     );
 }

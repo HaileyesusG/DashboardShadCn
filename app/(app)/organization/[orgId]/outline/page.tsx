@@ -46,7 +46,7 @@ const SECTION_TYPES = [
 
 const STATUSES = ["Pending", "In-Progress", "Completed"];
 
-const REVIEWERS = ["Eddie Lake", "Jamik Tashpulatov", "Assim", "Bini", "Mami"];
+const REVIEWERS = ["Assim", "Bini", "Mami"];
 
 const chartData = [
     { month: "January", desktop: 186, mobile: 80 },

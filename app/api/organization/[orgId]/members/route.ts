@@ -47,7 +47,35 @@ export async function GET(
             },
         });
 
-        return NextResponse.json({ members });
+        // For each member, fetch their owned organizations
+        const membersWithOwnedOrgs = await Promise.all(
+            members.map(async (member) => {
+                const ownedOrganizations = await prisma.organizationMember.findMany({
+                    where: {
+                        userId: member.user.id,
+                        role: "owner",
+                    },
+                    include: {
+                        organization: {
+                            select: {
+                                id: true,
+                                name: true,
+                            },
+                        },
+                    },
+                });
+
+                return {
+                    ...member,
+                    user: {
+                        ...member.user,
+                        ownedOrganizations: ownedOrganizations.map(om => om.organization),
+                    },
+                };
+            })
+        );
+
+        return NextResponse.json({ members: membersWithOwnedOrgs });
     } catch (error) {
         console.error("Error fetching members:", error);
         return NextResponse.json(
