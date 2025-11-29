@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { signIn } from "@/lib/auth-client";
 
 export default function SignInPage() {
     const router = useRouter();
@@ -23,25 +24,15 @@ export default function SignInPage() {
         setIsLoading(true);
 
         try {
-            const response = await fetch("/api/auth/signin", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    email: formData.email,
-                    password: formData.password,
-                }),
+            // Use better-auth's signIn method
+            const { data, error } = await signIn.email({
+                email: formData.email,
+                password: formData.password,
             });
 
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.error || "Invalid email or password");
+            if (error) {
+                throw new Error(error.message || "Invalid email or password");
             }
-
-            const data = await response.json();
-
-            // Store session token
-            localStorage.setItem("session_token", data.session.token);
-            localStorage.setItem("user", JSON.stringify(data.user));
 
             toast({
                 title: "Welcome back",

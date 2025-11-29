@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { arrayMove } from "@dnd-kit/sortable";
 import { Area, AreaChart, CartesianGrid, XAxis } from "recharts";
 import { TrendingUp } from "lucide-react";
@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/chart";
 import { useToast } from "@/hooks/use-toast";
 import { DataTable, Outline } from "@/components/data-table";
+import { useSession } from "@/lib/auth-client";
 
 const SECTION_TYPES = [
     "Table of Contents",
@@ -70,7 +71,9 @@ const chartConfig = {
 
 export default function OutlinePage() {
     const params = useParams();
+    const router = useRouter();
     const { toast } = useToast();
+    const { data: session, isPending } = useSession();
     const orgId = params.orgId as string;
 
     const [outlines, setOutlines] = useState<Outline[]>([]);
@@ -89,16 +92,20 @@ export default function OutlinePage() {
     });
 
     useEffect(() => {
-        fetchOutlines();
-    }, [orgId]);
+        if (!isPending && !session) {
+            router.push("/signin");
+            return;
+        }
+
+        if (session) {
+            fetchOutlines();
+        }
+    }, [orgId, session, isPending, router]);
 
     const fetchOutlines = async () => {
         try {
-            const sessionToken = localStorage.getItem("session_token");
             const response = await fetch(`/api/organization/${orgId}/outline`, {
-                headers: {
-                    "Authorization": `Bearer ${sessionToken}`,
-                },
+                credentials: "include",
             });
             if (!response.ok) throw new Error("Failed to fetch outlines");
 
@@ -151,13 +158,12 @@ export default function OutlinePage() {
 
             const method = editingOutline ? "PATCH" : "POST";
 
-            const sessionToken = localStorage.getItem("session_token");
             const response = await fetch(url, {
                 method,
                 headers: {
                     "Content-Type": "application/json",
-                    "Authorization": `Bearer ${sessionToken}`,
                 },
+                credentials: "include",
                 body: JSON.stringify(formData),
             });
 
@@ -188,12 +194,9 @@ export default function OutlinePage() {
         if (!confirm("Are you sure you want to delete this outline?")) return;
 
         try {
-            const sessionToken = localStorage.getItem("session_token");
             const response = await fetch(`/api/organization/${orgId}/outline/${id}`, {
                 method: "DELETE",
-                headers: {
-                    "Authorization": `Bearer ${sessionToken}`,
-                },
+                credentials: "include",
             });
 
             if (!response.ok) {
@@ -231,14 +234,13 @@ export default function OutlinePage() {
 
             // Persist order
             const ids = newItems.map(item => item.id);
-            const sessionToken = localStorage.getItem("session_token");
 
             fetch(`/api/organization/${orgId}/outline/reorder`, {
                 method: "PUT",
                 headers: {
                     "Content-Type": "application/json",
-                    "Authorization": `Bearer ${sessionToken}`,
                 },
+                credentials: "include",
                 body: JSON.stringify({ ids }),
             }).catch(error => {
                 console.error("Failed to save order:", error);
@@ -253,22 +255,28 @@ export default function OutlinePage() {
         });
     };
 
+    if (isPending || isLoading) {
+        return (
+            <div className="container mx-auto py-10 text-center">
+                <p className="text-muted-foreground">Loading...</p>
+            </div>
+        );
+    }
+
+    if (!session) {
+        return null;
+    }
+
     return (
         <div className="container mx-auto py-10">
-            {isLoading ? (
-                <div className="text-center py-8 text-muted-foreground">
-                    Loading outlines...
-                </div>
-            ) : (
-                <DataTable
-                    data={outlines}
-                    onUpdate={handleUpdate}
-                    onDelete={handleDelete}
-                    onDragEnd={handleDragEnd}
-                    onAddClick={() => handleOpenSheet()}
-                    onEditClick={handleOpenSheet}
-                />
-            )}
+            <DataTable
+                data={outlines}
+                onUpdate={handleUpdate}
+                onDelete={handleDelete}
+                onDragEnd={handleDragEnd}
+                onAddClick={() => handleOpenSheet()}
+                onEditClick={handleOpenSheet}
+            />
 
             <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
                 <SheetContent className="sm:max-w-[540px] overflow-y-auto">

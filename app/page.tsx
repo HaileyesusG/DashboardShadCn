@@ -4,28 +4,26 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { useSession } from "@/lib/auth-client";
 
 export default function Home() {
     const router = useRouter();
-    const [isLoading, setIsLoading] = useState(true);
+    const { data: session, isPending } = useSession();
+    const [isChecking, setIsChecking] = useState(false);
 
     useEffect(() => {
-        // Check if user is authenticated
-        const sessionToken = localStorage.getItem("session_token");
-        const user = localStorage.getItem("user");
+        if (isPending) return; // Wait for session to load
 
-        if (sessionToken && user) {
-            // Check for existing organizations and invitations
+        if (session?.user) {
+            // User is authenticated, check for organizations and invitations
+            setIsChecking(true);
+
             Promise.all([
                 fetch("/api/organization", {
-                    headers: {
-                        "Authorization": `Bearer ${sessionToken}`,
-                    },
+                    credentials: 'include',
                 }),
                 fetch("/api/invitations", {
-                    headers: {
-                        "Authorization": `Bearer ${sessionToken}`,
-                    },
+                    credentials: 'include',
                 })
             ])
                 .then(([orgRes, invRes]) => Promise.all([orgRes.json(), invRes.json()]))
@@ -47,16 +45,18 @@ export default function Home() {
                     // Priority 3: No organizations or invitations, create one
                     router.push("/create-organization");
                 })
-                .catch(() => {
+                .catch((error) => {
+                    console.error("Error checking organizations:", error);
                     // On error, redirect to create organization
                     router.push("/create-organization");
+                })
+                .finally(() => {
+                    setIsChecking(false);
                 });
-        } else {
-            setIsLoading(false);
         }
-    }, [router]);
+    }, [session, isPending, router]);
 
-    if (isLoading) {
+    if (isPending || isChecking) {
         return (
             <main className="flex min-h-screen flex-col items-center justify-center p-24">
                 <div className="text-center">
@@ -66,6 +66,7 @@ export default function Home() {
         );
     }
 
+    // Show landing page only for unauthenticated users
     return (
         <main className="flex min-h-screen flex-col items-center justify-center p-24 bg-gradient-to-br from-slate-50 to-slate-100">
             <div className="text-center space-y-6">

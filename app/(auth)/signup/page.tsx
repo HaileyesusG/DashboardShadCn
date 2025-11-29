@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { signUp } from "@/lib/auth-client";
 
 export default function SignUpPage() {
     const router = useRouter();
@@ -24,32 +25,23 @@ export default function SignUpPage() {
         setIsLoading(true);
 
         try {
-            const response = await fetch("/api/auth/signup", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    email: formData.email,
-                    password: formData.password,
-                    name: formData.name,
-                }),
+            // Use better-auth's signUp method
+            const { data, error } = await signUp.email({
+                email: formData.email,
+                password: formData.password,
+                name: formData.name,
             });
 
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.error || "Failed to create account");
+            if (error) {
+                throw new Error(error.message || "Failed to create account");
             }
-
-            const data = await response.json();
-
-            // Store session token
-            localStorage.setItem("session_token", data.session.token);
-            localStorage.setItem("user", JSON.stringify(data.user));
 
             toast({
                 title: "Account created",
                 description: "Your account has been created successfully.",
             });
 
+            // Redirect to create organization or home
             router.push("/create-organization");
         } catch (error: any) {
             toast({

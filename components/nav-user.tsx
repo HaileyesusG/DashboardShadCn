@@ -28,6 +28,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
+import { signOut } from "@/lib/auth-client"
 
 export function NavUser({
   user,
@@ -40,10 +41,9 @@ export function NavUser({
 }) {
   const { isMobile } = useSidebar()
 
-  const handleLogout = () => {
-    // Clear session data
-    localStorage.removeItem("session_token")
-    localStorage.removeItem("user")
+  const handleLogout = async () => {
+    // Use better-auth's signOut method
+    await signOut()
 
     // Redirect to signin page
     window.location.href = "/signin"

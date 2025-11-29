@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { Check, X, ArrowLeft } from "lucide-react";
 import Link from "next/link";
+import { useSession } from "@/lib/auth-client";
 
 interface Invitation {
     id: string;
@@ -22,20 +23,25 @@ interface Invitation {
 export default function InvitationsPage() {
     const router = useRouter();
     const { toast } = useToast();
+    const { data: session, isPending } = useSession();
     const [invitations, setInvitations] = useState<Invitation[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        fetchInvitations();
-    }, []);
+        if (!isPending && !session) {
+            router.push("/signin");
+            return;
+        }
+
+        if (session) {
+            fetchInvitations();
+        }
+    }, [session, isPending, router]);
 
     const fetchInvitations = async () => {
         try {
-            const sessionToken = localStorage.getItem("session_token");
             const response = await fetch("/api/invitations", {
-                headers: {
-                    "Authorization": `Bearer ${sessionToken}`,
-                },
+                credentials: "include",
             });
 
             if (response.ok) {
@@ -55,12 +61,9 @@ export default function InvitationsPage() {
 
     const handleAccept = async (token: string) => {
         try {
-            const sessionToken = localStorage.getItem("session_token");
             const response = await fetch(`/api/invitations/${token}/accept`, {
                 method: "POST",
-                headers: {
-                    "Authorization": `Bearer ${sessionToken}`,
-                },
+                credentials: "include",
             });
 
             if (!response.ok) {
@@ -87,12 +90,9 @@ export default function InvitationsPage() {
 
     const handleReject = async (token: string) => {
         try {
-            const sessionToken = localStorage.getItem("session_token");
             const response = await fetch(`/api/invitations/${token}/reject`, {
                 method: "POST",
-                headers: {
-                    "Authorization": `Bearer ${sessionToken}`,
-                },
+                credentials: "include",
             });
 
             if (!response.ok) {
@@ -113,6 +113,18 @@ export default function InvitationsPage() {
         }
     };
 
+    if (isPending || isLoading) {
+        return (
+            <div className="min-h-screen bg-slate-50 p-8 flex items-center justify-center">
+                <div className="text-muted-foreground">Loading...</div>
+            </div>
+        );
+    }
+
+    if (!session) {
+        return null;
+    }
+
     return (
         <div className="min-h-screen bg-slate-50 p-8">
             <div className="container mx-auto max-w-2xl">
@@ -131,11 +143,7 @@ export default function InvitationsPage() {
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
-                        {isLoading ? (
-                            <div className="text-center py-8 text-muted-foreground">
-                                Loading invitations...
-                            </div>
-                        ) : invitations.length === 0 ? (
+                        {invitations.length === 0 ? (
                             <div className="text-center py-8 text-muted-foreground">
                                 No pending invitations
                             </div>

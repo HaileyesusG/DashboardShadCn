@@ -7,50 +7,32 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { useSession } from "@/lib/auth-client";
 
 export default function CreateOrganizationPage() {
     const router = useRouter();
     const { toast } = useToast();
+    const { data: session, isPending } = useSession();
     const [isLoading, setIsLoading] = useState(false);
-    const [isCheckingOrgs, setIsCheckingOrgs] = useState(true);
     const [orgName, setOrgName] = useState("");
 
     useEffect(() => {
-        // Check authentication
-        const checkAuth = async () => {
-            try {
-                const sessionToken = localStorage.getItem("session_token");
-                if (!sessionToken) {
-                    router.push("/signin");
-                    return;
-                }
-            } catch (error) {
-                console.error("Error checking authentication:", error);
-            } finally {
-                setIsCheckingOrgs(false);
-            }
-        };
-
-        checkAuth();
-    }, [router]);
+        if (!isPending && !session) {
+            router.push("/signin");
+        }
+    }, [session, isPending, router]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
 
         try {
-            const sessionToken = localStorage.getItem("session_token");
-
-            if (!sessionToken) {
-                throw new Error("Not authenticated");
-            }
-
             const response = await fetch("/api/organization", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    "Authorization": `Bearer ${sessionToken}`,
                 },
+                credentials: "include",
                 body: JSON.stringify({
                     name: orgName,
                     slug: orgName.toLowerCase().replace(/\s+/g, "-"),
@@ -58,7 +40,8 @@ export default function CreateOrganizationPage() {
             });
 
             if (!response.ok) {
-                throw new Error("Failed to create organization");
+                const error = await response.json();
+                throw new Error(error.error || "Failed to create organization");
             }
 
             const data = await response.json();
@@ -80,7 +63,7 @@ export default function CreateOrganizationPage() {
         }
     };
 
-    if (isCheckingOrgs) {
+    if (isPending) {
         return (
             <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
                 <div className="text-center">
@@ -88,6 +71,10 @@ export default function CreateOrganizationPage() {
                 </div>
             </div>
         );
+    }
+
+    if (!session) {
+        return null; // Will redirect in useEffect
     }
 
     return (

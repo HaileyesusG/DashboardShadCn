@@ -25,6 +25,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Trash2, UserPlus } from "lucide-react";
+import { useSession } from "@/lib/auth-client";
 
 interface Member {
     id: string;
@@ -44,6 +45,7 @@ export default function TeamPage() {
     const params = useParams();
     const router = useRouter();
     const { toast } = useToast();
+    const { data: session, isPending } = useSession();
     const orgId = params.orgId as string;
 
     const [members, setMembers] = useState<Member[]>([]);
@@ -55,17 +57,21 @@ export default function TeamPage() {
     const [currentUserRole, setCurrentUserRole] = useState<string>("");
 
     useEffect(() => {
-        fetchMembers();
-        fetchOrganization();
-    }, [orgId]);
+        if (!isPending && !session) {
+            router.push("/signin");
+            return;
+        }
+
+        if (session) {
+            fetchMembers();
+            fetchOrganization();
+        }
+    }, [orgId, session, isPending, router]);
 
     const fetchOrganization = async () => {
         try {
-            const sessionToken = localStorage.getItem("session_token");
             const response = await fetch("/api/organization", {
-                headers: {
-                    "Authorization": `Bearer ${sessionToken}`,
-                },
+                credentials: "include",
             });
             if (response.ok) {
                 const data = await response.json();
@@ -81,21 +87,18 @@ export default function TeamPage() {
 
     const fetchMembers = async () => {
         try {
-            const sessionToken = localStorage.getItem("session_token");
             const response = await fetch(`/api/organization/${orgId}/members`, {
-                headers: {
-                    "Authorization": `Bearer ${sessionToken}`,
-                },
+                credentials: "include",
             });
             if (!response.ok) throw new Error("Failed to fetch members");
 
             const data = await response.json();
             setMembers(data.members);
 
-            // Determine current user role (simplified - in production, get from session)
-            const ownerMember = data.members.find((m: Member) => m.role === "owner");
+            // Determine current user role
+            const ownerMember = data.members.find((m: Member) => m.user.id === session?.user.id);
             if (ownerMember) {
-                setCurrentUserRole("owner"); // Simplified for demo
+                setCurrentUserRole(ownerMember.role);
             }
         } catch (error) {
             toast({
@@ -113,13 +116,12 @@ export default function TeamPage() {
         setIsInviting(true);
 
         try {
-            const sessionToken = localStorage.getItem("session_token");
             const response = await fetch(`/api/organization/${orgId}/members`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    "Authorization": `Bearer ${sessionToken}`,
                 },
+                credentials: "include",
                 body: JSON.stringify({ email: inviteEmail }),
             });
 
@@ -151,14 +153,11 @@ export default function TeamPage() {
         if (!confirm("Are you sure you want to remove this member?")) return;
 
         try {
-            const sessionToken = localStorage.getItem("session_token");
             const response = await fetch(
                 `/api/organization/${orgId}/members?memberId=${memberId}`,
                 {
                     method: "DELETE",
-                    headers: {
-                        "Authorization": `Bearer ${sessionToken}`,
-                    },
+                    credentials: "include",
                 }
             );
 
@@ -183,6 +182,18 @@ export default function TeamPage() {
     };
 
     const isOwner = currentUserRole === "owner";
+
+    if (isPending || isLoading) {
+        return (
+            <div className="container mx-auto py-10 text-center">
+                <p className="text-muted-foreground">Loading...</p>
+            </div>
+        );
+    }
+
+    if (!session) {
+        return null;
+    }
 
     return (
         <div className="container mx-auto py-10">
@@ -241,65 +252,59 @@ export default function TeamPage() {
                     </div>
                 </CardHeader>
                 <CardContent>
-                    {isLoading ? (
-                        <div className="text-center py-8 text-muted-foreground">
-                            Loading members...
-                        </div>
-                    ) : (
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Name</TableHead>
-                                    <TableHead>Email</TableHead>
-                                    <TableHead>Role</TableHead>
-                                    <TableHead>Organizations</TableHead>
-                                    {isOwner && <TableHead className="text-right">Actions</TableHead>}
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {members.map((member) => (
-                                    <TableRow key={member.id}>
-                                        <TableCell className="font-medium">
-                                            {member.user.name || "N/A"}
-                                        </TableCell>
-                                        <TableCell>{member.user.email}</TableCell>
-                                        <TableCell>
-                                            <span
-                                                className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${member.role === "owner"
-                                                        ? "bg-blue-100 text-blue-800"
-                                                        : "bg-gray-100 text-gray-800"
-                                                    }`}
-                                            >
-                                                {member.role}
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Name</TableHead>
+                                <TableHead>Email</TableHead>
+                                <TableHead>Role</TableHead>
+                                <TableHead>Organizations</TableHead>
+                                {isOwner && <TableHead className="text-right">Actions</TableHead>}
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {members.map((member) => (
+                                <TableRow key={member.id}>
+                                    <TableCell className="font-medium">
+                                        {member.user.name || "N/A"}
+                                    </TableCell>
+                                    <TableCell>{member.user.email}</TableCell>
+                                    <TableCell>
+                                        <span
+                                            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${member.role === "owner"
+                                                ? "bg-blue-100 text-blue-800"
+                                                : "bg-gray-100 text-gray-800"
+                                                }`}
+                                        >
+                                            {member.role}
+                                        </span>
+                                    </TableCell>
+                                    <TableCell>
+                                        {member.user.ownedOrganizations && member.user.ownedOrganizations.length > 0 ? (
+                                            <span className="text-sm">
+                                                {member.user.ownedOrganizations.map(org => org.name).join(", ")}
                                             </span>
-                                        </TableCell>
-                                        <TableCell>
-                                            {member.user.ownedOrganizations && member.user.ownedOrganizations.length > 0 ? (
-                                                <span className="text-sm">
-                                                    {member.user.ownedOrganizations.map(org => org.name).join(", ")}
-                                                </span>
-                                            ) : (
-                                                <span className="text-sm text-muted-foreground">None</span>
+                                        ) : (
+                                            <span className="text-sm text-muted-foreground">None</span>
+                                        )}
+                                    </TableCell>
+                                    {isOwner && (
+                                        <TableCell className="text-right">
+                                            {member.role !== "owner" && (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => handleRemove(member.id)}
+                                                >
+                                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                                </Button>
                                             )}
                                         </TableCell>
-                                        {isOwner && (
-                                            <TableCell className="text-right">
-                                                {member.role !== "owner" && (
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => handleRemove(member.id)}
-                                                    >
-                                                        <Trash2 className="h-4 w-4 text-destructive" />
-                                                    </Button>
-                                                )}
-                                            </TableCell>
-                                        )}
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    )}
+                                    )}
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
                 </CardContent>
             </Card>
         </div >

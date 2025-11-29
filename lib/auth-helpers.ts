@@ -1,33 +1,22 @@
-import { headers } from "next/headers";
+import { headers, cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "./prisma";
+import { auth } from "./auth";
 
 export async function getUserSession() {
-    const headersList = await headers();
-    const authHeader = headersList.get("authorization");
-
-    if (!authHeader) {
-        return null;
-    }
-
-    const token = authHeader.replace("Bearer ", "");
-
     try {
-        const session = await prisma.session.findUnique({
-            where: { token },
-            include: { user: true },
+        // Get session using better-auth
+        const session = await auth.api.getSession({
+            headers: await headers(),
         });
 
-        if (!session || session.expiresAt < new Date()) {
+        if (!session) {
             return null;
         }
 
         return {
             user: session.user,
-            session: {
-                token: session.token,
-                expiresAt: session.expiresAt,
-            },
+            session: session.session,
         };
     } catch (error) {
         return null;
